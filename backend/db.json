@@ -1,0 +1,51 @@
+{
+  "lastShader": "../shaders/着色器练习/03网格背景着色",
+  "tree": {
+    "type": "root",
+    "children": [
+      {
+        "type": "collection",
+        "name": "着色器练习",
+        "path": "../shaders/着色器练习",
+        "expanded": false,
+        "children": [
+          {
+            "type": "shader",
+            "name": "01三种映射对比",
+            "path": "../shaders/着色器练习/01三种映射对比",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "02三种映射变化",
+            "path": "../shaders/着色器练习/02三种映射变化",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "03网格背景着色",
+            "path": "../shaders/着色器练习/03网格背景着色",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "04老式电视风格",
+            "path": "../shaders/着色器练习/04老式电视风格",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "05光线着色尝试",
+            "path": "../shaders/着色器练习/05光线着色尝试",
+            "locked": true,
+            "cameraEnabled": true
+          }
+        ]
+      }
+    ]
+  }
+}
