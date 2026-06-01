@@ -144,5 +144,9 @@ export function getParsedConfig() {
 
 export function setUniformFromUI(name, rawValue) {
   if (!lastParsedConfig || !lastParsedConfig[name]) return false;
-  return updateUniformValue(lastParsedConfig, name, rawValue);
+  const result = updateUniformValue(lastParsedConfig, name, rawValue);
+  if (name === 'duration' && typeof lastParsedConfig.duration.value === 'number') {
+    updateMaxDuration(lastParsedConfig.duration.value);
+  }
+  return result;
 }

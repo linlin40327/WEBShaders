@@ -383,6 +383,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  user-select: none;
 }
 
 .shader-item-wrap .shader-item {
@@ -437,7 +438,7 @@ body {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  color: rgba(99, 102, 241, 0.35);
+  color: rgba(255, 255, 255, 0.2);
   padding: 4px;
   transition: color 0.15s, background 0.15s;
   opacity: 0;
@@ -647,6 +648,11 @@ body {
   outline-offset: 1px;
 }
 
+.drop-disabled {
+  opacity: 0.35 !important;
+  filter: grayscale(0.5);
+}
+
 .drag-hint {
   display: flex;
   border-radius: 6px;
@@ -689,6 +695,22 @@ body {
   justify-content: center;
   color: #fff;
   background: rgba(99, 102, 241, 0.5);
+}
+
+.drag-hint-disabled {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  background: rgba(239, 68, 68, 0.25);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  border-radius: 6px;
+  cursor: not-allowed;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 /* ==================== 顶栏布局 ==================== */

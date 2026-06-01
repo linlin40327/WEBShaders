@@ -1,9 +1,6 @@
-import * as THREE from 'three';
-import { resetUniforms } from './globalConfig.js';
-import { defaultVertex, defaultFragment, clearModels, addModels, setMaterial } from './scene.js';
 import { syncLastShaderToServer } from './shaderTree.js';
-import { createShaderItemElement } from './shaderItem.js';
-import { rebuildUniformList } from './uniformUI.js';
+import { loadFromServer, buildShaderTree } from './shaderTree.js';
+import { renderTree, setActiveShader, activateFirstShader } from './shaderItem.js';
 
 const drawer = document.getElementById('drawer');
 const drawerToggle = document.getElementById('drawer-toggle');
@@ -145,6 +142,17 @@ function closeDeleteModal() {
 
 let pendingRenameDir = '';
 
+async function refreshTree(activatePath) {
+  const shaderList = document.getElementById('shader-list');
+  shaderList.innerHTML = '';
+  const data = await loadFromServer();
+  const treeData = buildShaderTree(data.tree);
+  renderTree(treeData.children, shaderList, 0);
+  if (activatePath) {
+    setActiveShader(activatePath);
+  }
+}
+
 export function showRenameModal(dirPath, name) {
   pendingRenameDir = dirPath;
   const shortName = dirPath.replace(/^\.\.?\/shaders\//, '');
@@ -204,7 +212,8 @@ async function handleCreateCollection(name, parentPath) {
     return;
   }
 
-  window.location.reload();
+  closeModal();
+  refreshTree(null);
 }
 
 async function handleCreateShaderComplete(name, parentPath) {
@@ -212,49 +221,9 @@ async function handleCreateShaderComplete(name, parentPath) {
   if (!result) return;
 
   closeModal();
-
-  const vertSrc = `varying vec2 vUv;
-
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-  const fragSrc = `varying vec2 vUv;
-
-void main() {
-  gl_FragColor = vec4(vUv, 0.5, 1.0);
-}
-`;
-
-  const newMaterial = new THREE.ShaderMaterial({
-    vertexShader: vertSrc,
-    fragmentShader: fragSrc,
-  });
-
-  const geometry = new THREE.PlaneGeometry(2, 2);
-  const defaultMesh = new THREE.Mesh(geometry, newMaterial);
-  clearModels();
-  addModels([defaultMesh]);
-  setMaterial(newMaterial);
-  resetUniforms(newMaterial.uniforms);
-
-  const li = document.createElement('li');
-  li.style.listStyle = 'none';
-  const callbacks = { closeDrawer, showDeleteModal, showRenameModal, showToast, showCollectionItemModal, showDeleteCollectionModal };
-  li.appendChild(createShaderItemElement(result.dirPath, result.name, callbacks));
-  const shaderList = document.getElementById('shader-list');
-  shaderList.appendChild(li);
-
-  document.querySelectorAll('.shader-list .shader-item').forEach(el => el.classList.remove('active'));
-  const activeItem = li.querySelector('.shader-item');
-  activeItem.classList.add('active');
-
   localStorage.setItem('shader3d-last-shader', result.dirPath);
   syncLastShaderToServer();
-
-  rebuildUniformList();
+  refreshTree(result.dirPath);
 }
 
 export function initModals() {
@@ -273,12 +242,10 @@ export function initModals() {
   }
 
   resetBtn.addEventListener('click', () => {
-    localStorage.removeItem('shader3d-last-shader');
-    syncLastShaderToServer();
-    clearModels();
-    setMaterial(null);
-    document.querySelectorAll('.shader-list .shader-item').forEach(el => el.classList.remove('active'));
-    rebuildUniformList();
+    const lastShader = localStorage.getItem('shader3d-last-shader');
+    if (lastShader) {
+      setActiveShader(lastShader);
+    }
   });
 
   addBtn.addEventListener('click', () => {
@@ -345,23 +312,22 @@ export function initModals() {
       }
 
       closeDeleteModal();
-      localStorage.removeItem('shader3d-last-shader');
-      syncLastShaderToServer();
 
-      const newMaterial = new THREE.ShaderMaterial({
-        vertexShader: defaultVertex,
-        fragmentShader: defaultFragment,
-      });
-      const geometry = new THREE.PlaneGeometry(2, 2);
-      const defaultMesh = new THREE.Mesh(geometry, newMaterial);
-      clearModels();
-      addModels([defaultMesh]);
-      setMaterial(newMaterial);
-      resetUniforms(newMaterial.uniforms);
+      const lastShader = localStorage.getItem('shader3d-last-shader');
+      const isActiveAffected = lastShader === pendingDeleteDir
+        || (lastShader && pendingDeleteIsCollection
+          && (lastShader.startsWith(pendingDeleteDir + '/') || lastShader.startsWith(pendingDeleteDir + '\\')));
 
-      document.querySelectorAll('.shader-list .shader-item').forEach(el => el.classList.remove('active'));
+      if (isActiveAffected) {
+        localStorage.removeItem('shader3d-last-shader');
+        syncLastShaderToServer();
+      }
 
-      window.location.reload();
+      await refreshTree(isActiveAffected ? null : lastShader);
+
+      if (isActiveAffected) {
+        activateFirstShader();
+      }
     } catch (err) {
       console.error('网络错误', err);
     }
@@ -400,12 +366,23 @@ export function initModals() {
 
       closeRenameModal();
 
-      if (localStorage.getItem('shader3d-last-shader') === pendingRenameDir) {
+      const lastShader = localStorage.getItem('shader3d-last-shader');
+      let activatePath;
+
+      if (lastShader === pendingRenameDir) {
         localStorage.setItem('shader3d-last-shader', data.newPath);
         syncLastShaderToServer();
+        activatePath = data.newPath;
+      } else if (lastShader && (lastShader.startsWith(pendingRenameDir + '/') || lastShader.startsWith(pendingRenameDir + '\\'))) {
+        const newLastShader = lastShader.replace(pendingRenameDir, data.newPath);
+        localStorage.setItem('shader3d-last-shader', newLastShader);
+        syncLastShaderToServer();
+        activatePath = newLastShader;
+      } else {
+        activatePath = lastShader;
       }
 
-      window.location.reload();
+      refreshTree(activatePath);
     } catch (err) {
       renameModalError.textContent = '网络错误';
       renameModalError.classList.remove('hidden');

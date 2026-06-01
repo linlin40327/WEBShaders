@@ -3,6 +3,8 @@ import cors from 'cors';
 import { existsSync, mkdirSync, writeFileSync, rmSync, renameSync, readFileSync, cpSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { WebSocketServer } from 'ws';
+import chokidar from 'chokidar';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -126,18 +128,28 @@ function buildTreeFromFS() {
   function mergeNodes(fsNodes, oldNode) {
     if (!oldNode || !oldNode.children) return fsNodes;
     const oldMap = new Map(oldNode.children.map(c => [c.path, c]));
-    return fsNodes.map(fsNode => {
-      const old = oldMap.get(fsNode.path);
-      if (old) {
-        if (fsNode.type === 'shader' && old.type === 'shader') {
-          return { ...fsNode, locked: old.locked || false, cameraEnabled: old.cameraEnabled !== false };
-        }
-        if (fsNode.type === 'collection' && old.type === 'collection') {
-          return { ...fsNode, expanded: old.expanded !== false, children: mergeNodes(fsNode.children, old) };
-        }
+    const fsMap = new Map(fsNodes.map(n => [n.path, n]));
+    const result = [];
+
+    for (const oldChild of oldNode.children) {
+      const fsNode = fsMap.get(oldChild.path);
+      if (!fsNode) continue;
+      if (fsNode.type === 'shader' && oldChild.type === 'shader') {
+        result.push({ ...fsNode, locked: oldChild.locked || false, cameraEnabled: oldChild.cameraEnabled !== false });
+      } else if (fsNode.type === 'collection' && oldChild.type === 'collection') {
+        result.push({ ...fsNode, expanded: oldChild.expanded !== false, children: mergeNodes(fsNode.children, oldChild) });
+      } else {
+        result.push(fsNode);
       }
-      return fsNode;
-    });
+    }
+
+    for (const fsNode of fsNodes) {
+      if (!oldMap.has(fsNode.path)) {
+        result.push(fsNode);
+      }
+    }
+
+    return result;
   }
 
   const children = mergeNodes(fsChildren, oldTree);
@@ -256,24 +268,15 @@ app.get('/api/shader/config', (req, res) => {
   }
 });
 
-app.get('/api/shader/object-spec', (req, res) => {
+app.get('/api/shader/object-js', (req, res) => {
   const { path } = req.query;
   if (!path) return res.status(400).json({ error: 'path 不能为空' });
   const dir = fsPath(path);
-  const specPath = join(dir, 'object.json');
-  if (existsSync(specPath)) {
-    try {
-      return res.json(JSON.parse(readFileSync(specPath, 'utf-8')));
-    } catch {}
+  const objectJsPath = join(dir, 'js', 'object.js');
+  if (existsSync(objectJsPath)) {
+    return res.type('text/javascript').send(readFileSync(objectJsPath, 'utf-8'));
   }
-  const assetsDir = join(dir, 'assets');
-  if (existsSync(assetsDir)) {
-    const files = readdirSync(assetsDir).filter(f => /\.(glb|gltf)$/i.test(f));
-    if (files.length > 0) {
-      return res.json({ type: 'glb', asset: files[0] });
-    }
-  }
-  res.json({ type: 'plane' });
+  res.status(404).json({ error: 'object.js 不存在' });
 });
 
 app.get('/api/shader/asset', (req, res) => {
@@ -323,7 +326,23 @@ void main() {
 };
 `, 'utf-8');
 
-    writeFileSync(join(folderPath, 'object.json'), JSON.stringify({ type: 'plane' }, null, 2), 'utf-8');
+    writeFileSync(join(folderPath, 'js', 'object.js'), `import * as THREE from 'three';
+
+export function createObjects(config, shader) {
+  return new Promise(function(resolve) {
+    var geometry = new THREE.PlaneGeometry(2, 2);
+    var material = new THREE.ShaderMaterial({
+      vertexShader: shader.vertex,
+      fragmentShader: shader.fragment,
+      uniforms: config.uniforms,
+    });
+    var mesh = new THREE.Mesh(geometry, material);
+    var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    camera.position.z = 1;
+    resolve({ objects: [mesh], camera: camera });
+  });
+}
+`, 'utf-8');
 
     const db = readDb();
     const nodePath = `../shaders/${relPath}`;
@@ -431,6 +450,29 @@ app.post('/api/delete-collection', (req, res) => {
   if (!existsSync(folderPath)) {
     return res.status(404).json({ error: `收录 "${trimmed}" 不存在` });
   }
+
+  {
+    const dbPre = readDb();
+    const nodePathPre = `../shaders/${trimmed}`;
+    const nodePre = findNode(dbPre.tree, nodePathPre);
+    if (nodePre) {
+      function findLocked(n) {
+        if (n.locked) return n;
+        if (n.children) {
+          for (const c of n.children) {
+            const found = findLocked(c);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      const locked = findLocked(nodePre);
+      if (locked) {
+        return res.status(403).json({ error: '收录下有被锁定的着色器，请先解锁后再删除' });
+      }
+    }
+  }
+
   try {
     rmSync(folderPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 
@@ -538,6 +580,7 @@ app.post('/api/move-shader', async (req, res) => {
   if (!existsSync(sourcePath)) return res.status(404).json({ error: '源文件夹不存在' });
   if (existsSync(destPath)) return res.status(409).json({ error: '目标位置已存在同名文件夹' });
 
+
   try {
     await safeRename(sourcePath, destPath);
 
@@ -581,7 +624,52 @@ app.post('/api/move-shader', async (req, res) => {
   }
 });
 
+app.use('/shaders', express.static(SHADERS_DIR));
+
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+const httpServer = app.listen(port, () => {
   console.log(`API server running at http://localhost:${port}`);
+  console.log(`WebSocket ready`);
+});
+
+const wss = new WebSocketServer({ server: httpServer });
+
+let activeShaderFsPath = null;
+
+wss.on('connection', (ws) => {
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'active' && msg.path) {
+        activeShaderFsPath = fsPath(msg.path);
+      }
+    } catch {}
+  });
+});
+
+chokidar.watch(SHADERS_DIR, {
+  ignoreInitial: true,
+  awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+}).on('change', (filePath) => {
+  if (!activeShaderFsPath) return;
+  const f = filePath.replace(/\\/g, '/');
+  const a = activeShaderFsPath.replace(/\\/g, '/');
+  if (f.startsWith(a + '/') || f.startsWith(a + '\\')) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({ type: 'reload' }));
+      }
+    });
+  }
+}).on('add', (filePath) => {
+  if (!activeShaderFsPath) return;
+  const f = filePath.replace(/\\/g, '/');
+  const a = activeShaderFsPath.replace(/\\/g, '/');
+  if (f.startsWith(a + '/') || f.startsWith(a + '\\')) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({ type: 'reload' }));
+      }
+    });
+  }
 });

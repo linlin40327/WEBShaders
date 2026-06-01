@@ -106,18 +106,28 @@ function buildTreeFromFS() {
   function mergeNodes(fsNodes, oldNode) {
     if (!oldNode || !oldNode.children) return fsNodes;
     const oldMap = new Map(oldNode.children.map(c => [c.path, c]));
-    return fsNodes.map(fsNode => {
-      const old = oldMap.get(fsNode.path);
-      if (old) {
-        if (fsNode.type === 'shader' && old.type === 'shader') {
-          return { ...fsNode, locked: old.locked || false };
-        }
-        if (fsNode.type === 'collection' && old.type === 'collection') {
-          return { ...fsNode, expanded: old.expanded !== false, children: mergeNodes(fsNode.children, old) };
-        }
+    const fsMap = new Map(fsNodes.map(n => [n.path, n]));
+    const result = [];
+
+    for (const oldChild of oldNode.children) {
+      const fsNode = fsMap.get(oldChild.path);
+      if (!fsNode) continue;
+      if (fsNode.type === 'shader' && oldChild.type === 'shader') {
+        result.push({ ...fsNode, locked: oldChild.locked || false });
+      } else if (fsNode.type === 'collection' && oldChild.type === 'collection') {
+        result.push({ ...fsNode, expanded: oldChild.expanded !== false, children: mergeNodes(fsNode.children, oldChild) });
+      } else {
+        result.push(fsNode);
       }
-      return fsNode;
-    });
+    }
+
+    for (const fsNode of fsNodes) {
+      if (!oldMap.has(fsNode.path)) {
+        result.push(fsNode);
+      }
+    }
+
+    return result;
   }
 
   const children = mergeNodes(fsChildren, oldTree);
@@ -230,18 +240,20 @@ void main() {
 `, 'utf-8');
 
     writeFileSync(join(folderPath, 'js', 'object.js'), `import * as THREE from 'three';
-import vertex from '../shader/vertex.glsl?raw';
-import fragment from '../shader/fragment.glsl?raw';
 
-export default function createObjects(uniforms) {
-  const geometry = new THREE.PlaneGeometry(2, 2);
-  const material = new THREE.ShaderMaterial({
-    vertexShader: vertex,
-    fragmentShader: fragment,
-    uniforms,
+export function createObjects(config, shader) {
+  return new Promise(function(resolve) {
+    var geometry = new THREE.PlaneGeometry(2, 2);
+    var material = new THREE.ShaderMaterial({
+      vertexShader: shader.vertex,
+      fragmentShader: shader.fragment,
+      uniforms: config.uniforms,
+    });
+    var mesh = new THREE.Mesh(geometry, material);
+    var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    camera.position.z = 1;
+    resolve({ objects: [mesh], camera: camera });
   });
-  const mesh = new THREE.Mesh(geometry, material);
-  return [mesh];
 }
 `, 'utf-8');
 
@@ -351,6 +363,29 @@ app.post('/api/delete-collection', (req, res) => {
   if (!existsSync(folderPath)) {
     return res.status(404).json({ error: `收录 "${trimmed}" 不存在` });
   }
+
+  {
+    const dbPre = readDb();
+    const nodePathPre = `../shaders/${trimmed}`;
+    const nodePre = findNode(dbPre.tree, nodePathPre);
+    if (nodePre) {
+      function findLocked(n) {
+        if (n.locked) return n;
+        if (n.children) {
+          for (const c of n.children) {
+            const found = findLocked(c);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      const locked = findLocked(nodePre);
+      if (locked) {
+        return res.status(403).json({ error: '收录下有被锁定的着色器，请先解锁后再删除' });
+      }
+    }
+  }
+
   try {
     rmSync(folderPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 
@@ -458,6 +493,7 @@ app.post('/api/move-shader', async (req, res) => {
   if (!existsSync(sourcePath)) return res.status(404).json({ error: '源文件夹不存在' });
   if (existsSync(destPath)) return res.status(409).json({ error: '目标位置已存在同名文件夹' });
 
+
   try {
     await safeRename(sourcePath, destPath);
 
@@ -498,6 +534,72 @@ app.post('/api/move-shader', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+function fsPath(nodePath) {
+  return join(SHADERS_DIR, nodePath.replace(/^\.\.?\/shaders\//, ''));
+}
+
+app.get('/api/shader/vertex', (req, res) => {
+  const { path } = req.query;
+  if (!path) return res.status(400).json({ error: 'path 不能为空' });
+  const filePath = join(fsPath(path), 'shader', 'vertex.glsl');
+  if (!existsSync(filePath)) return res.status(404).json({ error: 'vertex.glsl 不存在' });
+  res.type('text/plain').send(readFileSync(filePath, 'utf-8'));
+});
+
+app.get('/api/shader/fragment', (req, res) => {
+  const { path } = req.query;
+  if (!path) return res.status(400).json({ error: 'path 不能为空' });
+  const filePath = join(fsPath(path), 'shader', 'fragment.glsl');
+  if (!existsSync(filePath)) return res.status(404).json({ error: 'fragment.glsl 不存在' });
+  res.type('text/plain').send(readFileSync(filePath, 'utf-8'));
+});
+
+app.get('/api/shader/config', (req, res) => {
+  const { path } = req.query;
+  if (!path) return res.status(400).json({ error: 'path 不能为空' });
+  const filePath = join(fsPath(path), 'js', 'config.js');
+  if (!existsSync(filePath)) return res.json({ uniforms: {} });
+  try {
+    const code = readFileSync(filePath, 'utf-8');
+    const fn = new Function(code.replace('export default', 'return'));
+    res.json(fn());
+  } catch {
+    res.json({ uniforms: {} });
+  }
+});
+
+app.get('/api/shader/object-js', (req, res) => {
+  const { path } = req.query;
+  if (!path) return res.status(400).json({ error: 'path 不能为空' });
+  const dir = fsPath(path);
+  const objectJsPath = join(dir, 'js', 'object.js');
+  if (existsSync(objectJsPath)) {
+    return res.type('text/javascript').send(readFileSync(objectJsPath, 'utf-8'));
+  }
+  res.status(404).json({ error: 'object.js 不存在' });
+});
+
+app.get('/api/shader/asset', (req, res) => {
+  const { path, file } = req.query;
+  if (!path || !file) return res.status(400).json({ error: 'path 和 file 不能为空' });
+  const filePath = join(fsPath(path), 'assets', file);
+  if (!existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
+  res.sendFile(filePath);
+});
+
+app.post('/api/tree/camera', (req, res) => {
+  const { path, cameraEnabled } = req.body;
+  if (!path) return res.status(400).json({ error: '路径不能为空' });
+  const db = readDb();
+  const node = findNode(db.tree, path);
+  if (!node) return res.status(404).json({ error: '节点不存在' });
+  node.cameraEnabled = cameraEnabled;
+  writeDb(db);
+  res.json({ success: true });
+});
+
+app.use('/shaders', express.static(SHADERS_DIR));
 
 app.use(express.static(join(__dirname, '..', 'frontend', 'dist')));
 
