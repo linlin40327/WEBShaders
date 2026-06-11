@@ -1,6 +1,15 @@
 import { syncLastShaderToServer } from './shaderTree.js';
 import { loadFromServer, buildShaderTree } from './shaderTree.js';
 import { renderTree, setActiveShader, activateFirstShader } from './shaderItem.js';
+import { sendActivePath } from './wsClient.js';
+
+let wsPauseUntil = 0;
+export function pauseWsAutoReload(ms = 2000) {
+  wsPauseUntil = Date.now() + ms;
+}
+export function isWsAutoReloadPaused() {
+  return Date.now() < wsPauseUntil;
+}
 
 const drawer = document.getElementById('drawer');
 const drawerToggle = document.getElementById('drawer-toggle');
@@ -373,16 +382,24 @@ export function initModals() {
         localStorage.setItem('shader3d-last-shader', data.newPath);
         syncLastShaderToServer();
         activatePath = data.newPath;
+        sendActivePath(data.newPath);
       } else if (lastShader && (lastShader.startsWith(pendingRenameDir + '/') || lastShader.startsWith(pendingRenameDir + '\\'))) {
         const newLastShader = lastShader.replace(pendingRenameDir, data.newPath);
         localStorage.setItem('shader3d-last-shader', newLastShader);
         syncLastShaderToServer();
         activatePath = newLastShader;
+        sendActivePath(newLastShader);
       } else {
         activatePath = lastShader;
       }
 
-      refreshTree(activatePath);
+      pauseWsAutoReload(2000);
+      try {
+        await refreshTree(activatePath);
+      } catch (err) {
+        console.error('refreshTree 失败:', err);
+        showToast('重命名成功，但刷新UI失败');
+      }
     } catch (err) {
       renameModalError.textContent = '网络错误';
       renameModalError.classList.remove('hidden');

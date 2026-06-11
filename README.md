@@ -142,6 +142,36 @@ export function createObjects(config, shader) {
 | `GET` | `/api/shader/asset` | 获取 assets 目录文件 |
 | — | `/shaders/` | 静态文件服务 |
 
+## WebSocket 协议
+
+后端在 `ws://localhost:3000` 提供 WebSocket 服务，实现文件热更新自动刷新。
+
+### 客户端 → 服务器
+
+| 消息 | 说明 |
+|------|------|
+| `{ type: "active", path: "着色器路径" }` | 通知后端当前激活的着色器路径，用于锁定监控范围 |
+
+### 服务器 → 客户端
+
+| 消息 | 说明 |
+|------|------|
+| `{ type: "reload", file: "js/object.js" }` | object.js 变更 → 前端完整重建造型、材质、摄像机 |
+| `{ type: "reload", file: "js/config.js" }` | config.js 变更 → 前端仅更新 uniform 值和 UI 控件，不动模型和摄像机 |
+| `{ type: "reload", file: "shader/vertex.glsl" }` 或 `"shader/fragment.glsl"` | GLSL 变更 → 前端仅重编译 ShaderMaterial，不动模型和摄像机 |
+
+### 行为特征
+
+- 自动重连：断线后 2 秒自动尝试重连
+- 重连后自动发送当前激活路径，恢复监控
+- 防抖：文件保存后 300ms 稳定期后才触发 reload
+- 变更类型：文件修改 (`change`) 和新增文件 (`add`) 均触发
+- 路由规则：前端根据 `file` 后缀决定刷新等级
+  - `object.js` → 完整重载（走 `setActiveShader`）
+  - `config.js` → 仅更新 uniform（`updateConfigUniforms`）
+  - `shader/*.glsl` → 仅重编译材质（`updateShaderCode`）
+  - 其他文件 → 完整重载（安全兜底）
+
 ## 生产构建
 
 ```bash

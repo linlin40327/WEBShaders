@@ -21,9 +21,20 @@ export default {
       max: 1.0,
       step: 0.1,
     },
-    lightDir: {
+    uLightDir: {
       type: 'vec3',
       value: [1.0, 1.0, 1.0],
+    },
+    specularPower: {
+      type: 'float',
+      value: 32.0,
+      min: 4.0,
+      max: 100.0,
+      step: 4.0,
+    },
+    specularButtom: {
+      type: 'bool',
+      value: true,
     },
   },
   objects: {

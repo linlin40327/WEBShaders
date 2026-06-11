@@ -6,6 +6,57 @@ import { loadShaderTextures, rebuildUniformList } from './uniformUI.js';
 import { showToast, showDeleteModal, showRenameModal, showDeleteCollectionModal, showCollectionItemModal } from './modal.js';
 import { sendActivePath } from './wsClient.js';
 
+let spinTimeout = null;
+
+export function spinResetBtn() {
+  const btn = document.getElementById('reset-btn');
+  if (!btn) return;
+  clearTimeout(spinTimeout);
+  btn.classList.remove('spinning');
+  void btn.offsetWidth;
+  btn.classList.add('spinning');
+  spinTimeout = setTimeout(() => {
+    btn.classList.remove('spinning');
+    spinTimeout = null;
+  }, 600);
+}
+
+export function reloadConfigOnly(dirPath) {
+  const encodedPath = encodeURIComponent(dirPath);
+  fetch(`/api/shader/config?path=${encodedPath}`)
+    .then(r => r.json())
+    .then(config => {
+      const theUniforms = mergeUniforms(config);
+      const materials = getAllMaterials();
+      for (const mat of materials) {
+        if (mat.isShaderMaterial && mat.uniforms) {
+          for (const key in theUniforms) {
+            mat.uniforms[key] = theUniforms[key];
+          }
+        }
+      }
+      rebuildUniformList();
+      loadShaderTextures(config, dirPath);
+    });
+}
+
+export function reloadShaderOnly(dirPath) {
+  const encodedPath = encodeURIComponent(dirPath);
+  Promise.all([
+    fetch(`/api/shader/vertex?path=${encodedPath}`).then(r => r.text()),
+    fetch(`/api/shader/fragment?path=${encodedPath}`).then(r => r.text()),
+  ]).then(([vertSrc, fragSrc]) => {
+    const materials = getAllMaterials();
+    for (const mat of materials) {
+      if (mat.isShaderMaterial) {
+        mat.vertexShader = vertSrc;
+        mat.fragmentShader = fragSrc;
+        mat.needsUpdate = true;
+      }
+    }
+  });
+}
+
 function createDefaultPlaneModel(config, shader) {
   const geometry = new THREE.PlaneGeometry(2, 2);
   const material = new THREE.ShaderMaterial({
@@ -122,6 +173,7 @@ export function setActiveShader(dirPath) {
     resetUniforms(theUniforms);
     rebuildUniformList();
     loadShaderTextures(config, dirPath);
+    spinResetBtn();
   }).catch(() => {
     const theUniforms = mergeUniforms({});
     const defaultModel = createDefaultPlaneModel(

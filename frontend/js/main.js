@@ -3,9 +3,9 @@ import { scene, getCamera, renderer, getAllMaterials } from './scene.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildShaderTree, loadFromServer, getTree, isCameraEnabled, toggleCameraEnabled } from './shaderTree.js';
 import { initPanel, initTimeButtons, updateTimelineUI } from './panel.js';
-import { renderTree, activateFirstShader, setActiveShader } from './shaderItem.js';
+import { renderTree, activateFirstShader, setActiveShader, reloadConfigOnly, reloadShaderOnly, spinResetBtn } from './shaderItem.js';
 import { initDragDrop } from './dnd.js';
-import { showToast, initModals } from './modal.js';
+import { showToast, initModals, isWsAutoReloadPaused } from './modal.js';
 import { connectWs } from './wsClient.js';
 
 const shaderList = document.getElementById('shader-list');
@@ -49,9 +49,20 @@ initTimeButtons();
 initDragDrop(showToast);
 initModals();
 
-connectWs(() => {
+connectWs((fileType) => {
+  if (isWsAutoReloadPaused()) return;
   const lastShader = localStorage.getItem('shader3d-last-shader');
-  if (lastShader) setActiveShader(lastShader);
+  if (!lastShader) return;
+
+  spinResetBtn();
+
+  if (fileType === 'config') {
+    reloadConfigOnly(lastShader);
+  } else if (fileType === 'shader') {
+    reloadShaderOnly(lastShader);
+  } else {
+    setActiveShader(lastShader);
+  }
 });
 
 init();

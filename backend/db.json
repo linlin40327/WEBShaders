@@ -1,5 +1,5 @@
 {
-  "lastShader": "../shaders/初级着色器/05光线着色尝试",
+  "lastShader": "../shaders/初级着色器/08有向距离场一",
   "tree": {
     "type": "root",
     "children": [
@@ -43,6 +43,27 @@
             "path": "../shaders/初级着色器/05光线着色尝试",
             "locked": true,
             "cameraEnabled": true
+          },
+          {
+            "type": "shader",
+            "name": "06漫画着色尝试",
+            "path": "../shaders/初级着色器/06漫画着色尝试",
+            "locked": true,
+            "cameraEnabled": true
+          },
+          {
+            "type": "shader",
+            "name": "07顶点着色练习",
+            "path": "../shaders/初级着色器/07顶点着色练习",
+            "locked": true,
+            "cameraEnabled": true
+          },
+          {
+            "type": "shader",
+            "name": "08有向距离场一",
+            "path": "../shaders/初级着色器/08有向距离场一",
+            "locked": true,
+            "cameraEnabled": false
           }
         ]
       },

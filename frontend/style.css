@@ -83,6 +83,27 @@ body {
   height: 100%;
 }
 
+@keyframes draw-arc {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes draw-arrow {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+#reset-btn.spinning svg path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-arc 0.3s ease-in-out forwards;
+}
+
+#reset-btn.spinning svg polyline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-arrow 0.3s 0.3s ease-in-out forwards;
+}
+
 #camera-btn {
   transition: background 0.3s, border-color 0.3s, color 0.3s;
 }

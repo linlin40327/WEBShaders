@@ -15,7 +15,7 @@ function tryConnect() {
     try {
       const msg = JSON.parse(event.data);
       if (msg.type === 'reload' && onReload) {
-        onReload();
+        onReload(msg.fileType || 'full');
       }
     } catch {}
   };

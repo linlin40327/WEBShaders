@@ -158,21 +158,8 @@ function buildTreeFromFS() {
 }
 
 async function safeRename(oldPath, newPath) {
-  for (let i = 0; i < 10; i++) {
-    try { renameSync(oldPath, newPath); return; }
-    catch (e) {
-      if (e.code === 'EPERM' && i < 9) { await new Promise(r => setTimeout(r, 200 * (i + 1))); continue; }
-      if (e.code !== 'EPERM') throw e;
-    }
-  }
   cpSync(oldPath, newPath, { recursive: true });
-  for (let i = 0; i < 10; i++) {
-    try { rmSync(oldPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); return; }
-    catch (e) {
-      if (i < 9) { await new Promise(r => setTimeout(r, 500 * (i + 1))); continue; }
-      console.error(`[safeRename] 无法删除旧目录: ${oldPath}`, e.message);
-    }
-  }
+  rmSync(oldPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 }
 
 function fsPath(nodePath) {
@@ -635,6 +622,19 @@ const httpServer = app.listen(port, () => {
 const wss = new WebSocketServer({ server: httpServer });
 
 let activeShaderFsPath = null;
+let reloadTimer = null;
+
+function debouncedReload(fileType) {
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(() => {
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({ type: 'reload', fileType }));
+      }
+    });
+    reloadTimer = null;
+  }, 500);
+}
 
 wss.on('connection', (ws) => {
   ws.on('message', (data) => {
@@ -647,29 +647,21 @@ wss.on('connection', (ws) => {
   });
 });
 
+function watchHandler(filePath) {
+  if (!activeShaderFsPath) return;
+  const f = filePath.replace(/\\/g, '/');
+  const a = activeShaderFsPath.replace(/\\/g, '/');
+  if (f.startsWith(a + '/') || f.startsWith(a + '\\')) {
+    const rel = f.slice(a.length + 1);
+    let fileType = 'full';
+    if (rel === 'js/config.js') fileType = 'config';
+    else if (rel === 'js/object.js') fileType = 'object';
+    else if (rel.startsWith('shader/') || rel.startsWith('shader\\')) fileType = 'shader';
+    debouncedReload(fileType);
+  }
+}
+
 chokidar.watch(SHADERS_DIR, {
   ignoreInitial: true,
   awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
-}).on('change', (filePath) => {
-  if (!activeShaderFsPath) return;
-  const f = filePath.replace(/\\/g, '/');
-  const a = activeShaderFsPath.replace(/\\/g, '/');
-  if (f.startsWith(a + '/') || f.startsWith(a + '\\')) {
-    wss.clients.forEach((client) => {
-      if (client.readyState === 1) {
-        client.send(JSON.stringify({ type: 'reload' }));
-      }
-    });
-  }
-}).on('add', (filePath) => {
-  if (!activeShaderFsPath) return;
-  const f = filePath.replace(/\\/g, '/');
-  const a = activeShaderFsPath.replace(/\\/g, '/');
-  if (f.startsWith(a + '/') || f.startsWith(a + '\\')) {
-    wss.clients.forEach((client) => {
-      if (client.readyState === 1) {
-        client.send(JSON.stringify({ type: 'reload' }));
-      }
-    });
-  }
-});
+}).on('change', watchHandler).on('add', watchHandler);
