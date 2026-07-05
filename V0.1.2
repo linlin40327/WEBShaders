@@ -1,47 +1,58 @@
 # V0.1.2 更新日志
 
-## 1. 移除 localStorage 同步系统
-- 删除 `frontend/js/localSync.js`
-- 简化前端/后端交互：后端不可达时直接弹出 toast "连接服务端失败，请检查后端是否运行"，不写入 localStorage
-- `frontend/js/main.js` 使用 `loadFromServer`（try/catch 显示错误提示）
+## 前端
+- 移除 localStorage 同步，后端不可达直接 toast 提示
+  - 删除 `frontend/js/localSync.js`
+  - `frontend/js/main.js` 改用 `loadFromServer`，try/catch 捕获失败后弹出 toast "连接服务端失败，请检查后端是否运行"
 
-## 2. 新增 change.log 追加日志
-- `backend/change.log`：文本文件，以 JSON 行格式追加记录所有变更操作
-- `backend/server.js`、`backend/prod-server.js` 新增 `appendLog()` 函数
-- 以下操作均写入日志：创建着色器、创建收录、删除着色器、删除收录、重命名、移动、锁定/解锁、摄像机开关、lastShader 变更
-- 每条日志包含：`action`、相关参数（path/name/value 等）、`time` 时间戳
-- 日志仅追加，不删除，不更新
+- 修复重命名竞态致 lastShader 丢失，以服务器返回值为准
+  - `syncLastShaderToServer()` 改为返回 Promise，所有调用点 await 等待完成后再 refreshTree，消除竞态
+  - 新增 `clearLastShaderOnServer()` 专门处理删除着色器时清空 lastShader 的场景
+  - `/api/rename-shader` 响应中返回 `lastShader`，前端直接使用不再自行比对路径字符串
+  - localStorage 为空时空值守卫，不向服务器发送 null
 
-## 3. 修复重命名后 lastShader 不更新 Bug
-### 根因
-- `syncLastShaderToServer()` 为 fire-and-forget（无 await），与后续 `refreshTree()` 产生竞态
-- `syncLastShaderToServer` 在 localStorage 为空时向服务器发送 `{ lastShader: null }`，误清除了服务器的 lastShader
-- 重命名时前端自行比对路径字符串，可能因格式差异匹配失败
+- 新建着色器 locked/cameraEnabled 默认 false
+  - `locked` 默认 false：新建着色器不锁定，可直接编辑
+  - `cameraEnabled` 默认 false：新建着色器不启用摄像机移动，需手动开启
 
-### 修复
-- `syncLastShaderToServer()` 改为返回 Promise，所有调用点均 `await`
-- 新增 `clearLastShaderOnServer()` 函数，专门用于删除着色器时清空 lastShader
-- `syncLastShaderToServer` 加入空值守卫：localStorage 为空时直接 `Promise.resolve()`，不发送 null
-- `/api/rename-shader` 端点响应中返回 `lastShader` 字段，前端以服务器返回值为权威来源
-- 删除、创建、重命名等操作：先 `await syncLastShaderToServer`，再 `await refreshTree`，避免竞态
+- WebSocket 重命名后暂停 2 秒防中断
+  - `modal.js` 新增 `pauseWsAutoReload()`，重命名完成后暂停 WebSocket 自动重载 2 秒，避免着色器加载期间被文件变更事件打断
 
-## 4. 新建着色器默认值
-- `locked` 默认为 `false`（不锁定）
-- `cameraEnabled` 默认为 `false`（不启用摄像机移动）
+## 后端
+- 新增 change.log 追加式操作日志
+  - `backend/server.js`、`backend/prod-server.js` 新增 `appendLog()` 函数
+  - 以 JSON 行格式追加到 `backend/change.log`，记录 action、参数、time 时间戳
+  - 覆盖操作：创建/删除着色器、创建/删除收录、重命名、移动、锁定/解锁、摄像机开关、lastShader 变更
+  - 仅追加，不删除不更新
 
-## 5. WebSocket 自动重载暂停机制
-- `modal.js` 新增 `pauseWsAutoReload()` 函数
-- 重命名后暂停 WebSocket 自动重载 2 秒，避免着色器加载过程中被文件变更触发中断
+- dotenv 端口配置
+  - `backend/.env` 定义 `PORT`，`frontend/.env` 定义 `VITE_PORT`
+  - `frontend/vite.config.js` 改用 `loadEnv()` 读取端口，替代不稳定的 `process.env.VITE_PORT`
+
+- 重命名端点响应新增 lastShader 字段，前端以服务器返回值为权威来源
+
+## 文档
+- 新增更新日志规范文件，要求以功能领域分类组织变更
+- README 补充 .env 端口配置、WebSocket 暂停机制、时间面板、新建着色器默认值等说明
 
 ## 修改文件清单
 | 文件 | 操作 | 说明 |
 |------|------|------|
-| `frontend/js/localSync.js` | 删除 | 移除不必要的 localStorage 同步 |
-| `backend/change.log` | 新增 | 追加式操作日志 |
-| `backend/server.js` | 修改 | appendLog、lastShader 守卫、重命名返回 lastShader |
-| `backend/prod-server.js` | 修改 | 同步 server.js 所有改动 |
-| `backend/db.json` | 修改 | 修正 lastShader |
+| `frontend/js/localSync.js` | 删除 | 移除 localStorage 同步 |
+| `frontend/js/main.js` | 修改 | 使用 loadFromServer 简化初始化 |
 | `frontend/js/shaderTree.js` | 修改 | syncLastShaderToServer 返回 Promise + 空值守卫、clearLastShaderOnServer |
 | `frontend/js/modal.js` | 修改 | 异步 await、lastShader 以服务器为准、暂停 WebSocket 重载 |
-| `frontend/js/main.js` | 修改 | 使用 loadFromServer 简化初始化 |
+| `frontend/js/panel.js` | 修改 | 时间面板按钮交互 |
+| `frontend/js/globalConfig.js` | 修改 | 时间循环/单次模式 |
+| `frontend/js/wsClient.js` | 修改 | WebSocket 暂停机制 |
+| `frontend/index.html` | 修改 | 时间面板按钮 |
+| `frontend/style.css` | 修改 | 时间面板样式 |
+| `frontend/.env` | 新增 | 前端端口配置 |
+| `frontend/vite.config.js` | 修改 | loadEnv 读取端口 |
+| `backend/server.js` | 修改 | appendLog、lastShader 守卫、重命名返回 lastShader |
+| `backend/prod-server.js` | 修改 | 同步 server.js 所有改动 |
+| `backend/.env` | 新增 | 后端端口配置 |
+| `backend/change.log` | 新增 | 追加式操作日志 |
+| `backend/db.json` | 修改 | 修正 lastShader |
+| `更新日志规范` | 新增 | 更新日志编写规范 |
 | `V0.1.2` | 新增 | 本更新日志 |

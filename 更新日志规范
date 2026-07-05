@@ -2,28 +2,24 @@
 
 ## 核心原则
 
-**以功能为单位组织内容**。每个功能标题下整合所有相关变更，不按文件逐条罗列，也不在末尾附按文件拆分的表格。
+**以功能领域分类组织内容**。按 前端/后端/着色器/文档 等大类划分，每个类别下列出粗要点，要点下用子条目展开具体改动。
 
-## 格式（参考 V1.1.2）
+Tag 说明用一句话概括；日志文件在粗要点下展开具体做了什么、涉及哪些文件。
+
+## 格式
 
 ```
 # VX.Y.Z 更新日志
 
-## 1. 功能名称（简短概括）
-- 描述 + 涉及文件及改动要点
-- 描述 + 涉及文件及改动要点
-- …
+## 类别名（前端/后端/着色器/文档/…）
+- 粗要点一句话概括
+  - 具体改动 1
+  - 具体改动 2
 
-## 2. 功能名称
-- …
+- 粗要点一句话概括
+  - …
 
-## 3. 修复类：Bug 标题
-### 根因
-- 原因 1
-- 原因 2
-
-### 修复
-- `文件`：改动说明
+## 类别名
 - …
 
 ## 修改文件清单
@@ -32,33 +28,31 @@
 | … | … | … |
 ```
 
-## 示例（来自 V1.1.2）
+## 示例（来自 V0.1.2）
 
 ```
-## 1. 移除 localStorage 同步系统
-- 删除 `frontend/js/localSync.js`
-- `frontend/js/main.js` 使用 `loadFromServer`（try/catch 显示错误提示）
-- 后端不可达时弹出 toast，不写入 localStorage
+## 前端
+- 移除 localStorage 同步，后端不可达直接 toast 提示
+  - 删除 `frontend/js/localSync.js`
+  - `frontend/js/main.js` 改用 `loadFromServer`，try/catch 失败后弹出 toast
 
-## 2. 新增 change.log 追加日志
-- `backend/change.log`：文本文件，以 JSON 行格式追加记录所有变更操作
-- `backend/server.js`、`backend/prod-server.js` 新增 `appendLog()` 函数
-- 日志仅追加，不删除，不更新
+- 修复重命名竞态致 lastShader 丢失，以服务器返回值为准
+  - `syncLastShaderToServer()` 改为返回 Promise，调用点 await 等待完成后再 refreshTree
+  - 新增 `clearLastShaderOnServer()` 专门处理删除着色器场景
+  - `/api/rename-shader` 响应返回 `lastShader`，前端直接使用
+  - localStorage 为空时不做空值守卫，不向服务器发送 null
 
-## 3. 修复重命名后 lastShader 不更新 Bug
-### 根因
-- `syncLastShaderToServer()` 为 fire-and-forget（无 await），竞态
-- localStorage 为空时发送 null，误清除服务器 lastShader
-
-### 修复
-- `syncLastShaderToServer()` 改为返回 Promise，调用点均 await
-- `/api/rename-shader` 响应返回 lastShader，前端以服务器为权威
+## 后端
+- 新增 change.log 追加式操作日志
+  - `backend/server.js`、`backend/prod-server.js` 新增 `appendLog()` 函数
+  - 以 JSON 行格式追加，覆盖创建/删除/重命名/移动/锁定/摄像机/lastShader 等操作
+  - 仅追加，不删除不更新
 ```
 
 ## 注意事项
 
-- 同类改动归于同一功能下，不拆散
-- 功能标题一句话说清做了什么
-- Bug 修复写清楚根因和修复措施
-- 不追求逐文件穷举，但每个功能涉及的改动要说全
-- 末尾附加“修改文件清单”表格，便于快速查阅所有涉及文件
+- 同一类别的改动归在一起
+- 粗要点一行概括，子条目写具体涉及的文件和函数
+- Bug 修复在粗要点里直接说明修复了什么，子条目展开修复措施
+- 末尾保留“修改文件清单”表格，便于快速查阅
+- 类别顺序：前端 → 后端 → 着色器 → 文档 → 其他
