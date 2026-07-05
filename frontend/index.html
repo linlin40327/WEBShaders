@@ -99,23 +99,44 @@
     <div id="panel-body" class="panel-body">
       <div class="panel-left">
         <div class="panel-timeline-row">
-          <input id="panel-timeline" class="panel-timeline" type="range" min="0" max="10" step="0.01" value="0">
+          <input id="panel-timeline" class="panel-timeline" type="range" min="0" max="9.99" step="0.01" value="0">
           <span id="panel-time-display" class="panel-time-display">0.00s</span>
         </div>
         <div class="panel-controls-row">
-          <button id="panel-time-reset-btn" class="panel-btn" title="回到初始时间">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="19 20 9 12 19 4 19 20"></polygon>
-              <line x1="5" y1="4" x2="5" y2="20"></line>
+          <button id="panel-time-loop-btn" class="panel-btn panel-btn-overlay" title="循环播放">
+            <svg id="panel-loop-loop-icon" class="panel-loop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:1">
+              <polyline points="17 1 21 5 17 9" pathLength="1"></polyline>
+              <path d="M3 11V9a4 4 0 014-4h14" pathLength="1"></path>
+              <polyline points="7 23 3 19 7 15" pathLength="1"></polyline>
+              <path d="M21 13v2a4 4 0 01-4 4H3" pathLength="1"></path>
+            </svg>
+            <svg id="panel-loop-once-icon" class="panel-loop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0">
+              <polyline points="17 1 21 5 17 9" pathLength="1"></polyline>
+              <path d="M3 11V9a4 4 0 014-4h14" pathLength="1"></path>
+              <polyline points="7 23 3 19 7 15" pathLength="1"></polyline>
+              <path d="M21 13v2a4 4 0 01-4 4H3" pathLength="1"></path>
+              <line x1="14" y1="10" x2="14" y2="14" pathLength="1"></line>
             </svg>
           </button>
-          <button id="panel-time-pause-btn" class="panel-btn" title="暂停/播放">
-            <svg id="panel-pause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="6" y="4" width="4" height="16"></rect>
-              <rect x="14" y="4" width="4" height="16"></rect>
+          <button id="panel-time-reset-btn" class="panel-btn" title="转至初始">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 5 5 12 12 19 12 5"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19"></line>
             </svg>
-            <svg id="panel-play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </button>
+          <button id="panel-time-pause-btn" class="panel-btn panel-btn-overlay" title="点击暂停">
+            <svg id="panel-pause-icon" class="panel-playpause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:1">
+              <rect x="6" y="4" width="4" height="16" pathLength="1"></rect>
+              <rect x="14" y="4" width="4" height="16" pathLength="1"></rect>
+            </svg>
+            <svg id="panel-play-icon" class="panel-playpause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0">
+              <polygon points="5 3 19 12 5 21 5 3" pathLength="1"></polygon>
+            </svg>
+          </button>
+          <button id="panel-time-end-btn" class="panel-btn" title="转至末尾">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 5 19 12 12 19 12 5"></polygon>
+              <line x1="5" y1="5" x2="5" y2="19"></line>
             </svg>
           </button>
           <button id="panel-time-speed-btn" class="panel-btn panel-speed-btn" title="切换倍速">1×</button>

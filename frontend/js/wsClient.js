@@ -2,7 +2,7 @@ let ws = null;
 let onReload = null;
 
 function tryConnect() {
-  ws = new WebSocket('ws://localhost:3000');
+  ws = new WebSocket(`ws://localhost:${import.meta.env.VITE_PORT || '3000'}`);
 
   ws.onopen = () => {
     const lastShader = localStorage.getItem('shader3d-last-shader');

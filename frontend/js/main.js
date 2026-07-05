@@ -38,10 +38,14 @@ cameraBtn.addEventListener('click', () => {
 });
 
 async function init() {
-  const data = await loadFromServer();
-  const treeData = buildShaderTree(data.tree);
-  renderTree(treeData.children, shaderList, 0);
-  activateFirstShader();
+  try {
+    const data = await loadFromServer();
+    const treeData = buildShaderTree(data.tree);
+    renderTree(treeData.children, shaderList, 0);
+    activateFirstShader();
+  } catch {
+    showToast('连接服务端失败，请检查后端是否运行');
+  }
 }
 
 initPanel();

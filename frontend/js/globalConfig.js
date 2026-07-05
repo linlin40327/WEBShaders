@@ -12,6 +12,7 @@ let speed = 1;
 let accumulatedTime = 0;
 let maxDuration = 0;
 let finished = false;
+let loopMode = 1; // 0 = 播放一次, 1 = 循环播放
 
 function animate() {
   requestAnimationFrame(animate);
@@ -19,9 +20,20 @@ function animate() {
   if (!paused) {
     accumulatedTime += delta * speed;
     if (maxDuration > 0 && accumulatedTime >= maxDuration) {
-      accumulatedTime = maxDuration;
-      paused = true;
-      finished = true;
+      if (loopMode === 0) {
+        accumulatedTime = maxDuration;
+        paused = true;
+        finished = true;
+      } else {
+        accumulatedTime = accumulatedTime % maxDuration;
+      }
+    } else if (maxDuration === 0 && loopMode === 0) {
+      const windowEnd = Math.floor(accumulatedTime / 10) * 10 + 9.99;
+      if (accumulatedTime >= windowEnd) {
+        accumulatedTime = windowEnd;
+        paused = true;
+        finished = true;
+      }
     }
   }
   uniforms.time.value = accumulatedTime;
@@ -36,6 +48,10 @@ export function resetTime() {
   accumulatedTime = 0;
   paused = false;
   finished = false;
+}
+
+export function getTime() {
+  return accumulatedTime;
 }
 
 export function setTime(value) {
@@ -65,10 +81,48 @@ export function isFinished() {
 }
 
 export function cycleSpeed() {
-  if (speed === 1) speed = 2;
+  if (speed === 0.5) speed = 1;
+  else if (speed === 1) speed = 2;
   else if (speed === 2) speed = 4;
-  else speed = 1;
+  else speed = 0.5;
   return speed;
+}
+
+export function getLoopMode() {
+  return loopMode;
+}
+
+export function cycleLoopMode() {
+  loopMode = loopMode === 0 ? 1 : 0;
+  if (loopMode === 1 && finished) {
+    // 切换为循环时，如果已完成则重置并恢复播放
+    accumulatedTime = 0;
+    paused = false;
+    finished = false;
+  }
+  return loopMode;
+}
+
+export function jumpToSegmentEnd() {
+  if (maxDuration > 0) {
+    accumulatedTime = maxDuration;
+  } else {
+    accumulatedTime = Math.floor(accumulatedTime / 10) * 10 + 9.99;
+  }
+  paused = false;
+  finished = false;
+  if (loopMode === 0 && maxDuration > 0) {
+    // 有 duration + 播放一次：跳转到末尾意味着完成
+    finished = true;
+    paused = true;
+  } else if (loopMode === 0 && maxDuration === 0) {
+    // 无 duration + 播放一次：跳转到窗口末尾即为完成
+    finished = true;
+    paused = true;
+  } else if (loopMode === 1 && maxDuration > 0) {
+    // 有 duration + 循环：末尾归零继续
+    accumulatedTime = accumulatedTime % maxDuration;
+  }
 }
 
 export { uniforms };

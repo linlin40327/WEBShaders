@@ -887,6 +887,7 @@ body {
 }
 
 .panel-btn {
+  position: relative;
   height: 34px;
   display: flex;
   align-items: center;
@@ -912,6 +913,33 @@ body {
 .panel-btn svg {
   width: 16px;
   height: 16px;
+  transition: opacity 200ms ease;
+}
+
+@keyframes draw-path {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.panel-btn.icon-draw svg path,
+.panel-btn.icon-draw svg polyline,
+.panel-btn.icon-draw svg polygon,
+.panel-btn.icon-draw svg rect,
+.panel-btn.icon-draw svg line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-path 200ms ease-in-out forwards;
+}
+
+.panel-loop-icon,
+.panel-playpause-icon {
+  grid-area: 1 / 1;
+}
+
+/* 重叠图标的按钮用 Grid 布局，共享网格单元 */
+.panel-btn-overlay {
+  display: grid !important;
+  place-items: center;
 }
 
 .panel-speed-btn {

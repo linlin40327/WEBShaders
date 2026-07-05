@@ -70,7 +70,7 @@ export function setLocked(dirPath, locked) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: dirPath, locked }),
-  }).catch(() => {});
+  }).catch(() => { showServerError(); });
 }
 
 export function toggleLock(dirPath) {
@@ -93,7 +93,7 @@ export function setCameraEnabled(dirPath, enabled) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: dirPath, cameraEnabled: enabled }),
-  }).catch(() => {});
+  }).catch(() => { showServerError(); });
 }
 
 export function toggleCameraEnabled(dirPath) {
@@ -103,11 +103,21 @@ export function toggleCameraEnabled(dirPath) {
 }
 
 export function syncLastShaderToServer() {
-  fetch('/api/db', {
+  const lastShader = localStorage.getItem('shader3d-last-shader');
+  if (!lastShader) return Promise.resolve();
+  return fetch('/api/db', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lastShader: localStorage.getItem('shader3d-last-shader') }),
-  }).catch(() => {});
+    body: JSON.stringify({ lastShader }),
+  }).catch(() => { showServerError(); });
+}
+
+export function clearLastShaderOnServer() {
+  return fetch('/api/db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lastShader: null }),
+  }).catch(() => { showServerError(); });
 }
 
 export function syncTreeExpand(dirPath, expanded) {
@@ -128,6 +138,7 @@ export function syncTreeReorder(parentPath, orderedPaths) {
 
 export async function loadFromServer() {
   const res = await fetch('/api/db');
+  if (!res.ok) throw new Error('无法连接到服务端');
   const data = await res.json();
 
   for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -147,5 +158,28 @@ export async function loadFromServer() {
   }
   syncLocks(data.tree);
 
+  if (data.lastShader) {
+    localStorage.setItem('shader3d-last-shader', data.lastShader);
+  } else {
+    localStorage.removeItem('shader3d-last-shader');
+  }
+
   return data;
+}
+
+// 当后端请求失败时弹出提示
+let _serverErrorTimer = null;
+function showServerError() {
+  if (_serverErrorTimer) return; // 防抖：短时间内不重复弹
+  _serverErrorTimer = setTimeout(() => { _serverErrorTimer = null; }, 3000);
+  const existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast-msg';
+  toast.textContent = '连接服务端失败，请检查后端是否运行';
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-hide');
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
 }

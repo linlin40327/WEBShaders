@@ -1,4 +1,4 @@
-import { togglePause, resetTime, cycleSpeed, setTime, getMaxDuration } from './globalConfig.js';
+import { togglePause, resetTime, cycleSpeed, setTime, getTime, getMaxDuration, getLoopMode, cycleLoopMode, jumpToSegmentEnd } from './globalConfig.js';
 
 const bottomPanel = document.getElementById('bottom-panel');
 const panelHandle = document.getElementById('panel-handle');
@@ -6,10 +6,22 @@ const panelTimeline = document.getElementById('panel-timeline');
 const panelTimeResetBtn = document.getElementById('panel-time-reset-btn');
 const panelTimePauseBtn = document.getElementById('panel-time-pause-btn');
 const panelTimeSpeedBtn = document.getElementById('panel-time-speed-btn');
+const panelTimeLoopBtn = document.getElementById('panel-time-loop-btn');
+const panelTimeEndBtn = document.getElementById('panel-time-end-btn');
 const panelTimeDisplay = document.getElementById('panel-time-display');
 const panelPauseIcon = document.getElementById('panel-pause-icon');
 const panelPlayIcon = document.getElementById('panel-play-icon');
+const panelLoopLoopIcon = document.getElementById('panel-loop-loop-icon');
+const panelLoopOnceIcon = document.getElementById('panel-loop-once-icon');
 const panelCollapseHint = document.getElementById('panel-collapse-hint');
+
+/** 触发 SVG 路径绘制动画（200ms） */
+function triggerDrawAnimation(btn) {
+  btn.classList.remove('icon-draw');
+  void btn.offsetWidth; // 强制回流，确保动画重播
+  btn.classList.add('icon-draw');
+  setTimeout(() => btn.classList.remove('icon-draw'), 250);
+}
 
 const PANEL_HEIGHT_KEY = 'shader3d-panel-height';
 const PANEL_COLLAPSED_KEY = 'shader3d-panel-collapsed';
@@ -126,21 +138,47 @@ export function initPanel() {
 
   panelTimeResetBtn.addEventListener('click', resetTime);
   panelTimeline.addEventListener('input', () => {
-    setTime(parseFloat(panelTimeline.value));
+    const val = parseFloat(panelTimeline.value);
+    if (getMaxDuration() > 0) {
+      setTime(val);
+    } else {
+      // 无 duration 时 slider 在 0-9.99 窗口内，需加上窗口偏移
+      const windowStart = Math.floor(getTime() / 10) * 10;
+      setTime(windowStart + val);
+    }
   });
 }
 
 export function initTimeButtons() {
   panelTimePauseBtn.addEventListener('click', () => {
     const paused = togglePause();
-    panelPauseIcon.style.display = paused ? 'none' : '';
-    panelPlayIcon.style.display = paused ? '' : 'none';
+    panelPauseIcon.style.opacity = paused ? '0' : '1';
+    panelPlayIcon.style.opacity = paused ? '1' : '0';
+    panelTimePauseBtn.title = paused ? '点击播放' : '点击暂停';
+    triggerDrawAnimation(panelTimePauseBtn);
   });
 
   panelTimeSpeedBtn.addEventListener('click', function () {
     const speed = cycleSpeed();
     this.textContent = speed + '\u00D7';
   });
+
+  panelTimeLoopBtn.addEventListener('click', function () {
+    const mode = cycleLoopMode();
+    panelLoopLoopIcon.style.opacity = mode === 1 ? '1' : '0';
+    panelLoopOnceIcon.style.opacity = mode === 1 ? '0' : '1';
+    this.title = mode === 1 ? '循环播放' : '播放一次';
+    triggerDrawAnimation(this);
+  });
+
+  panelTimeEndBtn.addEventListener('click', () => {
+    jumpToSegmentEnd();
+  });
+
+  // 初始化循环按钮图标
+  const initMode = getLoopMode();
+  panelLoopLoopIcon.style.opacity = initMode === 1 ? '1' : '0';
+  panelLoopOnceIcon.style.opacity = initMode === 1 ? '0' : '1';
 }
 
 export function updateTimelineUI(elapsed, maxDur, paused, finished) {
@@ -149,16 +187,18 @@ export function updateTimelineUI(elapsed, maxDur, paused, finished) {
     panelTimeline.value = elapsed.toFixed(2);
     panelTimeDisplay.textContent = elapsed.toFixed(2) + 's / ' + maxDur.toFixed(1) + 's';
   } else {
-    panelTimeline.max = 10;
+    panelTimeline.max = 9.99;
     panelTimeline.value = (elapsed % 10).toFixed(2);
     panelTimeDisplay.textContent = elapsed.toFixed(2) + 's';
   }
 
   if (finished || paused) {
-    panelPauseIcon.style.display = 'none';
-    panelPlayIcon.style.display = '';
+    panelPauseIcon.style.opacity = '0';
+    panelPlayIcon.style.opacity = '1';
+    panelTimePauseBtn.title = '点击播放';
   } else {
-    panelPauseIcon.style.display = '';
-    panelPlayIcon.style.display = 'none';
+    panelPauseIcon.style.opacity = '1';
+    panelPlayIcon.style.opacity = '0';
+    panelTimePauseBtn.title = '点击暂停';
   }
 }

@@ -1,7 +1,5 @@
-import { syncLastShaderToServer } from './shaderTree.js';
-import { loadFromServer, buildShaderTree } from './shaderTree.js';
+import { syncLastShaderToServer, loadFromServer, buildShaderTree, clearLastShaderOnServer } from './shaderTree.js';
 import { renderTree, setActiveShader, activateFirstShader } from './shaderItem.js';
-import { sendActivePath } from './wsClient.js';
 
 let wsPauseUntil = 0;
 export function pauseWsAutoReload(ms = 2000) {
@@ -231,7 +229,7 @@ async function handleCreateShaderComplete(name, parentPath) {
 
   closeModal();
   localStorage.setItem('shader3d-last-shader', result.dirPath);
-  syncLastShaderToServer();
+  await syncLastShaderToServer();
   refreshTree(result.dirPath);
 }
 
@@ -329,7 +327,7 @@ export function initModals() {
 
       if (isActiveAffected) {
         localStorage.removeItem('shader3d-last-shader');
-        syncLastShaderToServer();
+        await clearLastShaderOnServer();
       }
 
       await refreshTree(isActiveAffected ? null : lastShader);
@@ -375,30 +373,31 @@ export function initModals() {
 
       closeRenameModal();
 
-      const lastShader = localStorage.getItem('shader3d-last-shader');
-      let activatePath;
+      // 暂停 WebSocket 自动重载
+      pauseWsAutoReload(2000);
 
-      if (lastShader === pendingRenameDir) {
-        localStorage.setItem('shader3d-last-shader', data.newPath);
-        syncLastShaderToServer();
-        activatePath = data.newPath;
-        sendActivePath(data.newPath);
-      } else if (lastShader && (lastShader.startsWith(pendingRenameDir + '/') || lastShader.startsWith(pendingRenameDir + '\\'))) {
-        const newLastShader = lastShader.replace(pendingRenameDir, data.newPath);
-        localStorage.setItem('shader3d-last-shader', newLastShader);
-        syncLastShaderToServer();
-        activatePath = newLastShader;
-        sendActivePath(newLastShader);
-      } else {
-        activatePath = lastShader;
+      // 服务端重命名时已经更新了 db.lastShader，直接以服务器返回的为准
+      const normNewPath = data.newPath.replace(/\\/g, '/');
+      const normLastShader = data.lastShader ? data.lastShader.replace(/\\/g, '/') : null;
+
+      // 如果重命名的是当前激活的着色器，更新本地记录到新路径
+      if (normLastShader === normNewPath) {
+        localStorage.setItem('shader3d-last-shader', normNewPath);
+      } else if (normLastShader && normLastShader.startsWith(normNewPath + '/')) {
+        localStorage.setItem('shader3d-last-shader', normLastShader);
       }
 
-      pauseWsAutoReload(2000);
+      // 刷新 UI 树
       try {
-        await refreshTree(activatePath);
+        await refreshTree(null);
       } catch (err) {
         console.error('refreshTree 失败:', err);
-        showToast('重命名成功，但刷新UI失败');
+      }
+
+      // 激活正确的着色器
+      const activeShader = localStorage.getItem('shader3d-last-shader');
+      if (activeShader) {
+        setActiveShader(activeShader);
       }
     } catch (err) {
       renameModalError.textContent = '网络错误';

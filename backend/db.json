@@ -1,67 +1,81 @@
 {
-  "lastShader": "../shaders/初级着色器/08有向距离场一",
+  "lastShader": "../shaders/着色器进阶/噪声之旅/12分数布朗运动",
   "tree": {
     "type": "root",
     "children": [
       {
         "type": "collection",
-        "name": "初级着色器",
-        "path": "../shaders/初级着色器",
+        "name": "着色器入门",
+        "path": "../shaders/着色器入门",
         "expanded": true,
         "children": [
           {
             "type": "shader",
             "name": "01三种映射对比",
-            "path": "../shaders/初级着色器/01三种映射对比",
+            "path": "../shaders/着色器入门/01三种映射对比",
             "locked": true,
             "cameraEnabled": false
           },
           {
             "type": "shader",
             "name": "02三种映射变化",
-            "path": "../shaders/初级着色器/02三种映射变化",
+            "path": "../shaders/着色器入门/02三种映射变化",
             "locked": true,
             "cameraEnabled": false
           },
           {
             "type": "shader",
             "name": "03网格背景着色",
-            "path": "../shaders/初级着色器/03网格背景着色",
+            "path": "../shaders/着色器入门/03网格背景着色",
             "locked": true,
             "cameraEnabled": false
           },
           {
             "type": "shader",
             "name": "04老式电视风格",
-            "path": "../shaders/初级着色器/04老式电视风格",
+            "path": "../shaders/着色器入门/04老式电视风格",
             "locked": true,
             "cameraEnabled": false
           },
           {
             "type": "shader",
             "name": "05光线着色尝试",
-            "path": "../shaders/初级着色器/05光线着色尝试",
+            "path": "../shaders/着色器入门/05光线着色尝试",
             "locked": true,
             "cameraEnabled": true
           },
           {
             "type": "shader",
             "name": "06漫画着色尝试",
-            "path": "../shaders/初级着色器/06漫画着色尝试",
+            "path": "../shaders/着色器入门/06漫画着色尝试",
             "locked": true,
             "cameraEnabled": true
           },
           {
             "type": "shader",
             "name": "07顶点着色练习",
-            "path": "../shaders/初级着色器/07顶点着色练习",
+            "path": "../shaders/着色器入门/07顶点着色练习",
             "locked": true,
             "cameraEnabled": true
           },
           {
             "type": "shader",
-            "name": "08有向距离场一",
-            "path": "../shaders/初级着色器/08有向距离场一",
+            "name": "08初尝基础SDF",
+            "path": "../shaders/着色器入门/08初尝基础SDF",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "09SDF集合运算",
+            "path": "../shaders/着色器入门/09SDF集合运算",
+            "locked": true,
+            "cameraEnabled": false
+          },
+          {
+            "type": "shader",
+            "name": "10童话里的天幕",
+            "path": "../shaders/着色器入门/10童话里的天幕",
             "locked": true,
             "cameraEnabled": false
           }
@@ -72,7 +86,67 @@
         "name": "着色器进阶",
         "path": "../shaders/着色器进阶",
         "expanded": true,
-        "children": []
+        "children": [
+          {
+            "type": "collection",
+            "name": "噪声之旅",
+            "path": "../shaders/着色器进阶/噪声之旅",
+            "expanded": true,
+            "children": [
+              {
+                "type": "shader",
+                "name": "11摸索噪声之旅",
+                "path": "../shaders/着色器进阶/噪声之旅/11摸索噪声之旅",
+                "locked": true,
+                "cameraEnabled": false
+              },
+              {
+                "type": "shader",
+                "name": "12分数布朗运动",
+                "path": "../shaders/着色器进阶/噪声之旅/12分数布朗运动",
+                "locked": false,
+                "cameraEnabled": false
+              }
+            ]
+          },
+          {
+            "type": "collection",
+            "name": "光线步进",
+            "path": "../shaders/着色器进阶/光线步进",
+            "expanded": true,
+            "children": [
+              {
+                "type": "shader",
+                "name": "12探究光线步进",
+                "path": "../shaders/着色器进阶/光线步进/12探究光线步进",
+                "locked": true,
+                "cameraEnabled": false
+              },
+              {
+                "type": "shader",
+                "name": "13草地实例尝试",
+                "path": "../shaders/着色器进阶/光线步进/13草地实例尝试",
+                "locked": true,
+                "cameraEnabled": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "collection",
+        "name": "着色器测试",
+        "path": "../shaders/着色器测试",
+        "expanded": true,
+        "children": [
+          {
+            "type": "shader",
+            "name": "12光线步进着色",
+            "path": "../shaders/着色器测试/12光线步进着色",
+            "locked": true,
+            "cameraEnabled": true
+          }
+        ]
       }
     ]
   }

@@ -1,6 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { existsSync, mkdirSync, writeFileSync, rmSync, renameSync, readFileSync, cpSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, renameSync, readFileSync, cpSync, readdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
@@ -14,6 +15,13 @@ app.use(express.json());
 
 const DB_PATH = join(__dirname, 'db.json');
 const SHADERS_DIR = join(__dirname, 'shaders');
+const LOG_PATH = join(__dirname, 'change.log');
+
+function appendLog(entry) {
+  try {
+    appendFileSync(LOG_PATH, JSON.stringify({ ...entry, time: Date.now() }) + '\n', 'utf-8');
+  } catch {}
+}
 
 function readDb() {
   try {
@@ -176,7 +184,13 @@ app.get('/api/db', (req, res) => {
 });
 
 app.post('/api/db', (req, res) => {
-  res.json(writeDb({ ...readDb(), ...req.body }));
+  const db = readDb();
+  const merged = { ...db, ...req.body };
+  writeDb(merged);
+  if ('lastShader' in req.body) {
+    appendLog({ action: 'lastShader', value: req.body.lastShader });
+  }
+  res.json(merged);
 });
 
 app.post('/api/tree/reorder', (req, res) => {
@@ -200,6 +214,7 @@ app.post('/api/tree/lock', (req, res) => {
   if (!node) return res.status(404).json({ error: '节点不存在' });
   node.locked = locked;
   writeDb(db);
+  appendLog({ action: 'lock', path, value: locked });
   res.json({ success: true });
 });
 
@@ -211,6 +226,7 @@ app.post('/api/tree/camera', (req, res) => {
   if (!node) return res.status(404).json({ error: '节点不存在' });
   node.cameraEnabled = cameraEnabled;
   writeDb(db);
+  appendLog({ action: 'camera', path, value: cameraEnabled });
   res.json({ success: true });
 });
 
@@ -333,7 +349,7 @@ export function createObjects(config, shader) {
 
     const db = readDb();
     const nodePath = `../shaders/${relPath}`;
-    const shaderNode = { type: 'shader', name: trimmed, path: nodePath, locked: false };
+    const shaderNode = { type: 'shader', name: trimmed, path: nodePath, locked: false, cameraEnabled: false };
 
     if (parent) {
       const parentNode = findNode(db.tree, `../shaders/${parent}`);
@@ -347,6 +363,7 @@ export function createObjects(config, shader) {
     }
 
     writeDb(db);
+    appendLog({ action: 'create', path: nodePath, name: trimmed });
     res.json({ success: true, path: relPath });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -386,6 +403,7 @@ app.post('/api/create-collection', (req, res) => {
     }
 
     writeDb(db);
+    appendLog({ action: 'create-collection', path: nodePath, name: trimmed });
     res.json({ success: true, path: relPath });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -421,6 +439,7 @@ app.post('/api/delete-shader', (req, res) => {
     removeRecursive(db.tree, nodePath);
 
     writeDb(db);
+    appendLog({ action: 'delete', path: nodePath });
     res.json({ success: true, path: trimmed });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -470,6 +489,7 @@ app.post('/api/delete-collection', (req, res) => {
     removeNodeFromParent(db.tree, nodePath);
 
     writeDb(db);
+    appendLog({ action: 'delete-collection', path: nodePath });
     res.json({ success: true, path: trimmed });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -544,7 +564,8 @@ app.post('/api/rename-shader', async (req, res) => {
     }
 
     writeDb(db);
-    res.json({ success: true, newPath: newFullPath });
+    appendLog({ action: 'rename', oldPath: oldFullPath, newPath: newFullPath, newName: trimmedNew });
+    res.json({ success: true, newPath: newFullPath, lastShader: db.lastShader });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -605,6 +626,7 @@ app.post('/api/move-shader', async (req, res) => {
     }
 
     writeDb(db);
+    appendLog({ action: 'move', oldPath: oldDir, newPath: newDir });
     res.json({ success: true, newPath: newDir });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,0 +1,64 @@
+# 更新日志编写规范
+
+## 核心原则
+
+**以功能为单位组织内容**。每个功能标题下整合所有相关变更，不按文件逐条罗列，也不在末尾附按文件拆分的表格。
+
+## 格式（参考 V1.1.2）
+
+```
+# VX.Y.Z 更新日志
+
+## 1. 功能名称（简短概括）
+- 描述 + 涉及文件及改动要点
+- 描述 + 涉及文件及改动要点
+- …
+
+## 2. 功能名称
+- …
+
+## 3. 修复类：Bug 标题
+### 根因
+- 原因 1
+- 原因 2
+
+### 修复
+- `文件`：改动说明
+- …
+
+## 修改文件清单
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| … | … | … |
+```
+
+## 示例（来自 V1.1.2）
+
+```
+## 1. 移除 localStorage 同步系统
+- 删除 `frontend/js/localSync.js`
+- `frontend/js/main.js` 使用 `loadFromServer`（try/catch 显示错误提示）
+- 后端不可达时弹出 toast，不写入 localStorage
+
+## 2. 新增 change.log 追加日志
+- `backend/change.log`：文本文件，以 JSON 行格式追加记录所有变更操作
+- `backend/server.js`、`backend/prod-server.js` 新增 `appendLog()` 函数
+- 日志仅追加，不删除，不更新
+
+## 3. 修复重命名后 lastShader 不更新 Bug
+### 根因
+- `syncLastShaderToServer()` 为 fire-and-forget（无 await），竞态
+- localStorage 为空时发送 null，误清除服务器 lastShader
+
+### 修复
+- `syncLastShaderToServer()` 改为返回 Promise，调用点均 await
+- `/api/rename-shader` 响应返回 lastShader，前端以服务器为权威
+```
+
+## 注意事项
+
+- 同类改动归于同一功能下，不拆散
+- 功能标题一句话说清做了什么
+- Bug 修复写清楚根因和修复措施
+- 不追求逐文件穷举，但每个功能涉及的改动要说全
+- 末尾附加“修改文件清单”表格，便于快速查阅所有涉及文件
